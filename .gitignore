@@ -1,0 +1,13 @@
+# Python Environment
+venv/
+__pycache__/
+*.pyc
+
+# Environment Variables & Secrets
+.env
+firebase_credentials.json
+
+# User Uploads
+data/
+*.pdf
+*.mp4
