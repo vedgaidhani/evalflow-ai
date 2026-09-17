@@ -1,0 +1,8 @@
+streamlit
+PyPDF2
+google-generativeai
+opencv-python
+mediapipe
+SpeechRecognition
+pyttsx3
+firebase-admin
