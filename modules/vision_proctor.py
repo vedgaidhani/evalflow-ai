@@ -5,7 +5,17 @@ import os
 import urllib.request
 
 class VisionProctor:
+    # --- THE 10X FIX: CLASS-LEVEL SINGLETON LOCK ---
+    _active_instance = None
+
     def __init__(self):
+        # If a previous exam left a zombie camera running, kill it!
+        if VisionProctor._active_instance is not None:
+            print("♻️ PROCTOR: Cleaning up zombie camera thread from previous session...")
+            VisionProctor._active_instance.running = False
+            time.sleep(0.5)
+
+        VisionProctor._active_instance = self
         self.running = False
         self.strikes = 0
         self.face_cascade_path = os.path.join(os.path.dirname(__file__), 'haarcascade_frontalface_default.xml')
