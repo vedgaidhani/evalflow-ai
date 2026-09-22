@@ -87,20 +87,25 @@ if st.session_state.exam_questions and not st.session_state.exam_evaluation:
         # If the tab loses focus (visibilitychange), it fires an inescapable alert.
         # --- THE 10X JAVASCRIPT INJECTION (AUTO-WIPE) ---
         # --- THE 10X JAVASCRIPT INJECTION (VISUAL NUKE) ---
+        # --- THE 10X JAVASCRIPT INJECTION (VISUAL NUKE - FIXED) ---
         components.html(
             """
             <script>
             document.addEventListener('visibilitychange', function() {
                 if (document.hidden) {
-                    // Break out of the iframe and overwrite the entire webpage DOM
-                    window.parent.document.body.innerHTML = `
-                        <div style="background-color: #ff4b4b; color: white; height: 100vh; width: 100vw; display: flex; flex-direction: column; justify-content: center; align-items: center; font-family: sans-serif; z-index: 9999; position: fixed; top: 0; left: 0;">
-                            <h1 style="font-size: 4rem; margin-bottom: 10px;">🚨 CHEATING DETECTED</h1>
-                            <h3 style="font-size: 1.5rem;">Tab switching is strictly prohibited.</h3>
-                            <p style="font-size: 1rem; margin-top: 30px;">Terminating exam and wiping data in 3 seconds...</p>
-                        </div>
+                    // Create a new full-screen red overlay
+                    const overlay = window.parent.document.createElement('div');
+                    overlay.style.cssText = 'background-color: #ff4b4b; color: white; height: 100vh; width: 100vw; display: flex; flex-direction: column; justify-content: center; align-items: center; font-family: sans-serif; z-index: 999999; position: fixed; top: 0; left: 0;';
+                    overlay.innerHTML = `
+                        <h1 style="font-size: 4rem; margin-bottom: 10px;">🚨 CHEATING DETECTED</h1>
+                        <h3 style="font-size: 1.5rem;">Tab switching is strictly prohibited.</h3>
+                        <p style="font-size: 1rem; margin-top: 30px;">Terminating exam and wiping data in 3 seconds...</p>
                     `;
-                    // Wait 3 seconds, then destroy the session
+                    
+                    // Stack it on top of the page WITHOUT destroying the script
+                    window.parent.document.body.appendChild(overlay);
+                    
+                    // The script survives to trigger the refresh
                     setTimeout(function() {
                         window.parent.location.reload();
                     }, 3000);
