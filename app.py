@@ -8,6 +8,7 @@ import os
 # Link our new security module
 sys.path.append(os.path.abspath('.'))
 from modules.vision_proctor import VisionProctor
+from modules.audio_proctor import AudioProctor
 
 st.set_page_config(page_title="EvalFlow AI", page_icon="⚙️", layout="centered")
 
@@ -20,8 +21,14 @@ if 'exam_evaluation' not in st.session_state:
     st.session_state.exam_evaluation = None
 if 'proctor' not in st.session_state:
     st.session_state.proctor = VisionProctor()
+if 'audio_proctor' not in st.session_state:     
+    st.session_state.audio_proctor = AudioProctor()
 if 'tab_strikes' not in st.session_state:
     st.session_state.tab_strikes = 0
+if 'vision_penalty' not in st.session_state:
+    st.session_state.vision_penalty = 0
+if 'audio_penalty' not in st.session_state:
+    st.session_state.audio_penalty = 0
 
 # --- SIDEBAR: API CONFIGURATION ---
 with st.sidebar:
@@ -75,6 +82,7 @@ if st.session_state.extracted_skills:
                 
                 # TURN ON THE SECURITY CAMERA
                 st.session_state.proctor.start_proctoring()
+                st.session_state.audio_proctor.start_proctoring()
                 st.rerun()
                 
 # --- PHASE 1 UI: THE EXAM FORM ---
@@ -88,29 +96,33 @@ if st.session_state.exam_questions and not st.session_state.exam_evaluation:
         # --- THE 10X JAVASCRIPT INJECTION (AUTO-WIPE) ---
         # --- THE 10X JAVASCRIPT INJECTION (VISUAL NUKE) ---
         # --- THE 10X JAVASCRIPT INJECTION (VISUAL NUKE - FIXED) ---
+        # --- THE 10X JAVASCRIPT INJECTION (VISUAL NUKE - FIXED) ---
         components.html(
             """
             <script>
-            document.addEventListener('visibilitychange', function() {
-                if (document.hidden) {
-                    // Create a new full-screen red overlay
-                    const overlay = window.parent.document.createElement('div');
-                    overlay.style.cssText = 'background-color: #ff4b4b; color: white; height: 100vh; width: 100vw; display: flex; flex-direction: column; justify-content: center; align-items: center; font-family: sans-serif; z-index: 999999; position: fixed; top: 0; left: 0;';
-                    overlay.innerHTML = `
-                        <h1 style="font-size: 4rem; margin-bottom: 10px;">🚨 CHEATING DETECTED</h1>
-                        <h3 style="font-size: 1.5rem;">Tab switching is strictly prohibited.</h3>
-                        <p style="font-size: 1rem; margin-top: 30px;">Terminating exam and wiping data in 3 seconds...</p>
-                    `;
-                    
-                    // Stack it on top of the page WITHOUT destroying the script
-                    window.parent.document.body.appendChild(overlay);
-                    
-                    // The script survives to trigger the refresh
-                    setTimeout(function() {
-                        window.parent.location.reload();
-                    }, 3000);
-                }
-            });
+            // Only add the listener once to prevent Streamlit from duplicating it
+            if (!window.parent.examNukeListenerAdded) {
+                window.parent.examNukeListenerAdded = true;
+                
+                window.parent.document.addEventListener('visibilitychange', function() {
+                    if (window.parent.document.hidden) {
+                        const overlay = window.parent.document.createElement('div');
+                        overlay.style.cssText = 'background-color: #ff4b4b; color: white; height: 100vh; width: 100vw; display: flex; flex-direction: column; justify-content: center; align-items: center; font-family: sans-serif; z-index: 999999; position: fixed; top: 0; left: 0;';
+                        overlay.innerHTML = `
+                            <h1 style="font-size: 4rem; margin-bottom: 10px;">🚨 CHEATING DETECTED</h1>
+                            <h3 style="font-size: 1.5rem;">Tab switching is strictly prohibited.</h3>
+                            <p style="font-size: 1rem; margin-top: 30px;">Terminating exam and wiping data in 3 seconds...</p>
+                        `;
+                        
+                        window.parent.document.body.appendChild(overlay);
+                        
+                        // Attach setTimeout to the PARENT window so Streamlit cannot destroy it
+                        window.parent.setTimeout(function() {
+                            window.parent.location.reload();
+                        }, 3000);
+                    }
+                });
+            }
             </script>
             """,
             height=0,
@@ -122,10 +134,16 @@ if st.session_state.exam_questions and not st.session_state.exam_evaluation:
             st.text_area(f"Answer for Q{i+1}", key=f"ans_{i}")
             
         submitted = st.form_submit_button("Submit Exam")
-        # ... (keep the rest of your submission logic exactly the same) ...
         if submitted:
-            # TURN OFF THE CAMERA AND GET STRIKES
-            penalty_seconds = st.session_state.proctor.stop_proctoring()
+            # TURN OFF CAMERAS/MICS AND GET PENALTIES
+            vision_penalty_seconds = st.session_state.proctor.stop_proctoring()
+            audio_penalty_seconds = st.session_state.audio_proctor.stop_proctoring()
+            
+            # Save to memory so we can show the user
+            st.session_state.vision_penalty = vision_penalty_seconds
+            st.session_state.audio_penalty = audio_penalty_seconds
+            
+            total_penalty_seconds = vision_penalty_seconds + audio_penalty_seconds
             
             with st.spinner("AI is grading your responses and analyzing security logs..."):
                 qa_pairs = ""
@@ -134,11 +152,10 @@ if st.session_state.exam_questions and not st.session_state.exam_evaluation:
                     qa_pairs += f"Q{i+1}: {q}\nCandidate Answer: {user_answer}\n\n"
                 
                 model = genai.GenerativeModel('gemini-3.6-flash')
-                # Passing the penalty data to the AI grader
                 grading_prompt = f"""You are a strict technical evaluator. 
                 Review the following questions and the candidate's answers. Provide a score out of 10 for each.
                 
-                CRITICAL SECURITY ALERT: The candidate received {penalty_seconds} seconds of cheating penalties from the vision proctor. 
+                CRITICAL SECURITY ALERT: The candidate received {total_penalty_seconds} seconds of cheating penalties from the vision and audio proctors. 
                 Deduct 1 point from the Total Score for every 5 seconds of cheating. Note this deduction at the bottom of the evaluation.
                 
                 {qa_pairs}"""
@@ -151,4 +168,12 @@ if st.session_state.exam_questions and not st.session_state.exam_evaluation:
 if st.session_state.exam_evaluation:
     st.markdown("---")
     st.markdown("### Step 3: AI Evaluation & Security Results")
+    
+    # Expose the background audio/vision logic to the UI
+    col1, col2 = st.columns(2)
+    with col1:
+        st.error(f"👁️ **Vision Penalty:** {st.session_state.vision_penalty} seconds")
+    with col2:
+        st.error(f"🎤 **Audio Penalty:** {st.session_state.audio_penalty} seconds")
+        
     st.info(st.session_state.exam_evaluation)
