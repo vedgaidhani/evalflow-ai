@@ -9,6 +9,7 @@ import os
 sys.path.append(os.path.abspath('.'))
 from modules.vision_proctor import VisionProctor
 from modules.audio_proctor import AudioProctor
+from modules.voice_interview import VoiceInterview
 
 st.set_page_config(page_title="EvalFlow AI", page_icon="⚙️", layout="centered")
 
@@ -29,6 +30,16 @@ if 'vision_penalty' not in st.session_state:
     st.session_state.vision_penalty = 0
 if 'audio_penalty' not in st.session_state:
     st.session_state.audio_penalty = 0
+if 'interviewer' not in st.session_state:         #(For interview )
+    st.session_state.interviewer = VoiceInterview()
+if 'interview_question' not in st.session_state:
+    st.session_state.interview_question = ""
+if 'interview_transcript' not in st.session_state:
+    st.session_state.interview_transcript = ""
+if 'interview_evaluation' not in st.session_state:
+    st.session_state.interview_evaluation = ""
+if 'resume_text' not in st.session_state:
+    st.session_state.resume_text = ""
 
 # --- SIDEBAR: API CONFIGURATION ---
 with st.sidebar:
@@ -49,6 +60,7 @@ uploaded_file = st.file_uploader("Upload Technical Resume (PDF)", type=["pdf"])
 if uploaded_file is not None:
     pdf_reader = PyPDF2.PdfReader(uploaded_file)
     extracted_text = "".join(page.extract_text() for page in pdf_reader.pages)
+    st.session_state.resume_text = extracted_text
     st.success("Resume uploaded successfully!")
     
     if api_key and st.session_state.extracted_skills is None:
@@ -177,3 +189,66 @@ if st.session_state.exam_evaluation:
         st.error(f"🎤 **Audio Penalty:** {st.session_state.audio_penalty} seconds")
         
     st.info(st.session_state.exam_evaluation)
+
+    # --- PHASE 2: LIVE VOICE INTERVIEW ---
+if st.session_state.exam_evaluation and not st.session_state.interview_evaluation:
+    st.markdown("---")
+    st.markdown("### Step 4: Live AI Voice Interview")
+    st.warning("Ensure your speakers are on and your microphone is ready. The AI will speak a question, and you will have 10 seconds to answer out loud.")
+    
+    if st.button("Start Live Interview"):
+        with st.spinner("AI is generating your technical interview question..."):
+            model = genai.GenerativeModel('gemini-3.6-flash')
+            
+            # 1. Generate a tough question based on the resume
+            prompt = f"Based on this resume: {st.session_state.resume_text}. Generate ONE highly technical, challenging interview question to test their actual knowledge. Do not include any formatting, just the question text."
+            question_response = model.generate_content(prompt)
+            st.session_state.interview_question = question_response.text
+            
+            st.info(f"**AI Asks:** {st.session_state.interview_question}")
+            
+            # 2. Speak the question out loud!
+            st.session_state.interviewer.speak(st.session_state.interview_question)
+            
+            # 3. Record the user's verbal answer
+            st.write("🎤 **RECORDING YOUR ANSWER NOW... (10 Seconds)**")
+            # Force the UI to update so the user sees the recording message
+            st.empty() 
+            
+            audio_file = st.session_state.interviewer.record_audio_to_file(duration=10)
+            
+            # 4. Transcribe the audio
+            st.write("🧠 Transcribing your answer...")
+            transcript = st.session_state.interviewer.transcribe_audio(audio_file)
+            st.session_state.interview_transcript = transcript
+            st.rerun()
+
+# --- PHASE 2 RESULTS ---
+if st.session_state.interview_transcript and not st.session_state.interview_evaluation:
+    st.markdown("---")
+    st.success(f"**Your Transcribed Answer:** {st.session_state.interview_transcript}")
+    
+    # --- THE UX UPGRADE: AUTO-GRADING ---
+    # No more clicking a button! It grades instantly.
+    with st.spinner("AI is analyzing your voice response and making the final Hire / No Hire decision..."):
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        eval_prompt = f"""You are the final Hiring Manager. 
+        The candidate was asked: "{st.session_state.interview_question}"
+        Their verbal answer was transcribed as: "{st.session_state.interview_transcript}"
+        
+        Evaluate their answer for technical accuracy. Give a final score out of 10 for the interview.
+        End your evaluation with a bolded FINAL DECISION: [HIRE or NO HIRE]."""
+        
+        final_eval = model.generate_content(eval_prompt)
+        st.session_state.interview_evaluation = final_eval.text
+        st.rerun()
+
+if st.session_state.interview_evaluation:
+    st.markdown("---")
+    st.markdown("### 🏆 FINAL VERDICT")
+    st.info(st.session_state.interview_evaluation)
+    
+    # Give them a button to restart the whole app and test again
+    if st.button("End Session & Restart Pipeline"):
+        st.session_state.clear()
+        st.rerun()
