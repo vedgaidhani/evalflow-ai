@@ -12,6 +12,77 @@ from modules.audio_proctor import AudioProctor
 from modules.voice_interview import VoiceInterview
 
 st.set_page_config(page_title="EvalFlow AI", page_icon="⚙️", layout="centered")
+# --- UI TWEAKS: REMOVE DEFAULT PADDING ---
+st.markdown(
+    """
+    <style>
+    /* 1. Shrink top padding completely and hide Streamlit watermarks */
+    .block-container {
+        padding-top: 1rem !important;
+        padding-bottom: 0rem !important;
+    }
+    header { visibility: hidden; }
+    footer { visibility: hidden; }
+    #MainMenu { visibility: hidden; }
+
+    /* 2. Cyber-Blue Animated Buttons */
+    .stButton > button {
+        width: 100%;
+        border-radius: 8px;
+        border: 1px solid #00d2ff;
+        background-color: transparent;
+        color: #00d2ff;
+        transition: all 0.3s ease;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+    }
+    
+    /* Button Hover Glowing Effect */
+    .stButton > button:hover {
+        background-color: #00d2ff;
+        color: #040b14;
+        box-shadow: 0 0 15px rgba(0, 210, 255, 0.4);
+        border-color: #00d2ff;
+    }
+
+    /* 3. Sleek Input Boxes and Text Areas */
+    .stTextInput>div>div>input, .stTextArea>div>div>textarea {
+        border-radius: 8px;
+        border: 1px solid #2a3f5f;
+        background-color: #0a192f;
+        color: #e6f1ff;
+    }
+    
+    /* Neon Glow when typing in a box */
+    .stTextInput>div>div>input:focus, .stTextArea>div>div>textarea:focus {
+        border-color: #00d2ff;
+        box-shadow: 0 0 8px rgba(0, 210, 255, 0.5);
+    }
+
+    /* 4. Custom File Uploader Dashboard */
+    .stFileUploader>div>div {
+        border: 1px dashed #00d2ff !important;
+        border-radius: 8px;
+        background-color: #0a192f;
+        transition: all 0.3s ease;
+    }
+    .stFileUploader>div>div:hover {
+        background-color: #0f2444;
+        border: 1px solid #00d2ff !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+import os
+if os.path.exists("logo.png"):
+    # The columns help center the logo nicely
+    col1, col2, col3 = st.columns([2, 1.5, 2])
+    with col2:
+        st.image("logo.png", use_container_width=True)
+else:
+    st.title("⚙️ EvalFlow AI")
 
 # --- SESSION STATE INITIALIZATION ---
 if 'extracted_skills' not in st.session_state:
