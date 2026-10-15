@@ -2,6 +2,8 @@ streamlit
 PyPDF2
 google-generativeai
 opencv-python
+sounddevice
+scipy
+numpy
 SpeechRecognition
 pyttsx3
-firebase-admin
